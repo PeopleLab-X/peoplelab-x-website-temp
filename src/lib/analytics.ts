@@ -1,38 +1,74 @@
-/**
- * PeopleLab X - Analytics (No-Cookie/Console-Only Version)
- * We operate entirely without cookies, trackers, or non-essential scripts.
- * This ensures 100% GDPR-compliance and zero cookie banner intrusion.
- */
+export type PeopleLabFunnelStage =
+  | 'SIGNAL'
+  | 'SITUATION'
+  | 'REFRAME'
+  | 'FIT'
+  | 'CONVERSION'
+  | 'QUALIFICATION'
+  | 'SCOPE'
+  | 'DELIVERY'
+  | 'EXPANSION';
 
-export interface TestEventLog {
-  id: string;
-  timestamp: string;
-  type: "event" | "consent_default" | "consent_update";
-  name: string;
-  params?: Record<string, any>;
-}
+export type PeopleLabEventName =
+  | 'cta_click'
+  | 'form_start'
+  | 'form_selection'
+  | 'form_submit'
+  | 'form_error';
 
-export const GA_MEASUREMENT_ID = "";
+export type PeopleLabEventParameters = {
+  cta_id?: string;
+  cta_text?: string;
+  form_id?: string;
+  form_name?: string;
+  form_status?: string;
+  conversion_type?: string;
+  product?: string;
+  strategic_situation?: string;
+  funnel_stage?: PeopleLabFunnelStage;
+  language?: 'DA' | 'EN';
+  page_path?: string;
+  [key: string]: string | number | boolean | undefined;
+};
 
-export function clearAnalyticsCookies() {
-  // No-op as we do not write cookies
-}
-
-export function loadGA4Script() {
-  // No-op to avoid loading tracking scripts
-}
-
-export function initAnalyticsState() {
-  // No-op to ensure no cookies or external trackers are initialized
-}
-
-export function trackEvent(eventName: string, eventParams?: Record<string, any>) {
-  // We log events to console in development only for debugging routing, without storing or tracking any PII
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[Analytics Event] ${eventName}`, eventParams);
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
   }
 }
 
-export function updateConsentState(analyticsGranted: boolean) {
-  // No-op
+export function trackPeopleLabEvent(
+  eventName: PeopleLabEventName,
+  parameters: PeopleLabEventParameters = {}
+): void {
+  if (
+    typeof window === 'undefined' ||
+    typeof window.gtag !== 'function'
+  ) {
+    return;
+  }
+
+  const cleanParameters = Object.fromEntries(
+    Object.entries(parameters).filter(
+      ([, value]) =>
+        value !== undefined &&
+        value !== null &&
+        value !== ''
+    )
+  );
+
+  window.gtag('event', eventName, {
+    event_source: 'peoplelab_web',
+    tracking_version: '1.0',
+    ...cleanParameters,
+  });
 }
+
+export function trackEvent(
+  eventName: string,
+  parameters: Record<string, any> = {}
+): void {
+  trackPeopleLabEvent(eventName as PeopleLabEventName, parameters as PeopleLabEventParameters);
+}
+
+export {};

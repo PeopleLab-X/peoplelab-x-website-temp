@@ -1,38 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
-    "module": "ESNext",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
     "skipLibCheck": true,
-    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
     "isolatedModules": true,
-    "moduleDetection": "force",
-    "allowJs": true,
-    "jsx": "react-jsx",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
-    "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": [
-    "src/**/*",
-    "server.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "inspect-*.ts",
-    "test-*.ts",
-    "search-notion.ts",
-    "retrieve-live-schemas.ts"
-  ]
+  "include": ["server.ts"]
 }

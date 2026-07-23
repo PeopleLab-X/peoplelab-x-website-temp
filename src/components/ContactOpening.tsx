@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { ArrowRight, Mail, CheckCircle2, AlertCircle } from "lucide-react";
 import { motion } from "motion/react";
+import { trackPeopleLabEvent } from "../lib/analytics";
 
 interface ContactOpeningProps {
   currentLanguage: "da" | "en";
@@ -8,6 +9,8 @@ interface ContactOpeningProps {
 
 export default function ContactOpening({ currentLanguage }: ContactOpeningProps) {
   const isEn = currentLanguage === "en";
+  const analyticsLanguage = isEn ? "EN" : "DA";
+  const hasStartedRef = useRef(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -15,6 +18,8 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
     email: "",
     enquiry: "",
     website_hp: "", // honeypot field
+    strategic_situation: "",
+    product: "",
   });
 
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -61,19 +66,86 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
 
   const mailtoUrl = `mailto:office@peoplelabx.com?subject=${encodeURIComponent(t.subject)}`;
 
+  const handleFormInteraction = () => {
+    if (!hasStartedRef.current) {
+      hasStartedRef.current = true;
+      trackPeopleLabEvent("form_start", {
+        form_id: "contact_qualification_form",
+        form_name: "PeopleLab X Contact Qualification",
+        form_status: "started",
+        conversion_type: "confidential_inquiry",
+        funnel_stage: "QUALIFICATION",
+        language: analyticsLanguage,
+        page_path: typeof window !== "undefined" ? window.location.pathname : "",
+      });
+    }
+  };
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+    if (name !== "website_hp") {
+      handleFormInteraction();
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+
+    if (name === "strategic_situation" || name === "situation") {
+      trackPeopleLabEvent("form_selection", {
+        form_id: "contact_qualification_form",
+        form_name: "PeopleLab X Contact Qualification",
+        selection_type: "strategic_situation",
+        selected_value: value,
+        strategic_situation: value,
+        funnel_stage: "SITUATION",
+        language: analyticsLanguage,
+        page_path: typeof window !== "undefined" ? window.location.pathname : "",
+      });
+    } else if (name === "product") {
+      trackPeopleLabEvent("form_selection", {
+        form_id: "contact_qualification_form",
+        form_name: "PeopleLab X Contact Qualification",
+        selection_type: "product",
+        selected_value: value,
+        product: value,
+        funnel_stage: "FIT",
+        language: analyticsLanguage,
+        page_path: typeof window !== "undefined" ? window.location.pathname : "",
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (status === "submitting") return;
+
+    if (formData.website_hp) {
+      // Honeypot triggered - stop without sending any GA4 analytics event
+      setStatus("error");
+      setErrorMessage(t.errorMsg);
+      return;
+    }
+
+    if (!formData.name.trim() || !formData.company.trim() || !formData.email.trim() || !formData.enquiry.trim()) {
+      setStatus("error");
+      setErrorMessage(t.errorMsg);
+      trackPeopleLabEvent("form_error", {
+        form_id: "contact_qualification_form",
+        form_name: "PeopleLab X Contact Qualification",
+        form_status: "error",
+        error_type: "validation",
+        conversion_type: "confidential_inquiry",
+        strategic_situation: formData.strategic_situation || undefined,
+        product: formData.product || undefined,
+        funnel_stage: "CONVERSION",
+        language: analyticsLanguage,
+        page_path: typeof window !== "undefined" ? window.location.pathname : "",
+      });
+      return;
+    }
 
     setStatus("submitting");
     setErrorMessage("");
@@ -94,6 +166,17 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
 
       if (response.ok && data.success) {
         setStatus("success");
+        trackPeopleLabEvent("form_submit", {
+          form_id: "contact_qualification_form",
+          form_name: "PeopleLab X Contact Qualification",
+          form_status: "success",
+          conversion_type: "confidential_inquiry",
+          strategic_situation: formData.strategic_situation || undefined,
+          product: formData.product || undefined,
+          funnel_stage: "CONVERSION",
+          language: analyticsLanguage,
+          page_path: typeof window !== "undefined" ? window.location.pathname : "",
+        });
         // Clear form on success
         setFormData({
           name: "",
@@ -101,18 +184,44 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
           email: "",
           enquiry: "",
           website_hp: "",
+          strategic_situation: "",
+          product: "",
         });
       } else {
         setStatus("error");
         const errorCategory = data.error || "temporary server error";
         console.warn(`[Contact Form Submission Failed] Safe Category: ${errorCategory}`);
         setErrorMessage(t.errorMsg);
+        trackPeopleLabEvent("form_error", {
+          form_id: "contact_qualification_form",
+          form_name: "PeopleLab X Contact Qualification",
+          form_status: "error",
+          error_type: "backend",
+          conversion_type: "confidential_inquiry",
+          strategic_situation: formData.strategic_situation || undefined,
+          product: formData.product || undefined,
+          funnel_stage: "CONVERSION",
+          language: analyticsLanguage,
+          page_path: typeof window !== "undefined" ? window.location.pathname : "",
+        });
       }
     } catch (err) {
       console.error("Form submission error:", err);
       setStatus("error");
       console.warn("[Contact Form Submission Failed] Safe Category: temporary server error");
       setErrorMessage(t.errorMsg);
+      trackPeopleLabEvent("form_error", {
+        form_id: "contact_qualification_form",
+        form_name: "PeopleLab X Contact Qualification",
+        form_status: "error",
+        error_type: "network",
+        conversion_type: "confidential_inquiry",
+        strategic_situation: formData.strategic_situation || undefined,
+        product: formData.product || undefined,
+        funnel_stage: "CONVERSION",
+        language: analyticsLanguage,
+        page_path: typeof window !== "undefined" ? window.location.pathname : "",
+      });
     }
   };
 
@@ -159,7 +268,10 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
               </p>
               <button
                 type="button"
-                onClick={() => setStatus("idle")}
+                onClick={() => {
+                  hasStartedRef.current = false;
+                  setStatus("idle");
+                }}
                 className="mt-4 text-xs font-mono uppercase tracking-widest text-[#244C43] font-bold border-b border-[#244C43] hover:border-transparent transition-all"
               >
                 {isEn ? "Send another message" : "Send ny henvendelse"}
@@ -189,7 +301,7 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
                   id="website_hp"
                   name="website_hp"
                   value={formData.website_hp}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, website_hp: e.target.value }))}
                   tabIndex={-1}
                   autoComplete="off"
                 />
@@ -210,6 +322,7 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
+                    onFocus={handleFormInteraction}
                     required
                     aria-required="true"
                     disabled={status === "submitting"}
@@ -230,6 +343,7 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
                     name="company"
                     value={formData.company}
                     onChange={handleInputChange}
+                    onFocus={handleFormInteraction}
                     required
                     aria-required="true"
                     disabled={status === "submitting"}
@@ -252,6 +366,7 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
+                  onFocus={handleFormInteraction}
                   required
                   aria-required="true"
                   disabled={status === "submitting"}
@@ -272,6 +387,7 @@ export default function ContactOpening({ currentLanguage }: ContactOpeningProps)
                   name="enquiry"
                   value={formData.enquiry}
                   onChange={handleInputChange}
+                  onFocus={handleFormInteraction}
                   required
                   aria-required="true"
                   disabled={status === "submitting"}
